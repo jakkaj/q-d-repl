@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Simplified wrapper for single-line commands
+# For multiline commands, write them to a file and use: pydebug-simple <file> <line> "exec(open('cmd.py').read())"
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd /workspaces/substrate
+
+# Check if we have enough arguments
+if [ $# -lt 3 ]; then
+    echo "Usage: pydebug-simple <file> <line> <command> -- [pytest args]"
+    exit 1
+fi
+
+FILE="$1"
+LINE="$2"
+COMMAND="$3"
+
+# Shift the first 3 arguments
+shift 3
+
+# Collect remaining args
+PYTEST_ARGS=()
+if [ "$1" = "--" ]; then
+    shift
+    PYTEST_ARGS=("$@")
+fi
+
+# Make file path absolute if it isn't already
+if [[ ! "$FILE" = /* ]]; then
+    FILE="$(pwd)/$FILE"
+fi
+
+# Run the debugger
+PYTHONPATH=/workspaces/substrate python3 -m smart_debugger.smart_debugger "$FILE" "$LINE" "$COMMAND" -- "${PYTEST_ARGS[@]}"

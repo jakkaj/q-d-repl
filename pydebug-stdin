@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""
+Smart debugger wrapper that reads REPL command from stdin.
+This allows for easy piping of multiline commands.
+
+Usage:
+    # Pytest mode (default)
+    echo 'print(variable)' | pydebug-stdin file.py 42 -- -xvs
+    cat debug_cmd.py | pydebug-stdin file.py 42 -- -xvs
+    
+    # Standalone mode
+    echo 'print(sys.argv)' | pydebug-stdin --mode standalone script.py 5 -- arg1 arg2
+    echo 'print(data)' | pydebug-stdin --mode standalone -m module_name 10
+"""
+import sys
+import os
+import subprocess
+
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    
+    # Check for --mode flag
+    mode = 'pytest'  # Default mode
+    mode_idx = -1
+    for i, arg in enumerate(args):
+        if arg == '--mode' and i + 1 < len(args):
+            mode = args[i + 1]
+            mode_idx = i
+            break
+    
+    if mode_idx >= 0:
+        # Remove --mode and its value
+        args.pop(mode_idx)  # Remove --mode
+        args.pop(mode_idx)  # Remove the mode value
+    
+    # Check for -m flag (module mode) in standalone
+    is_module = False
+    if mode == 'standalone' and '-m' in args:
+        is_module = True
+        args.remove('-m')
+    
+    # Check for quiet mode
+    quiet_flag = []
+    if '--quiet' in args:
+        quiet_flag = ['--quiet']
+        args.remove('--quiet')
+    elif '-q' in args:
+        quiet_flag = ['-q']
+        args.remove('-q')
+    
+    if len(args) < 2:
+        print("Usage: <command> | pydebug-stdin [--mode MODE] [--quiet|-q] [-m] <file> <line> -- [args]", file=sys.stderr)
+        print("Modes: pytest (default), standalone", file=sys.stderr)
+        print("Example: echo 'print(x)' | pydebug-stdin test.py 10 -- -xvs", file=sys.stderr)
+        print("         echo 'print(x)' | pydebug-stdin --quiet test.py 10 -- -xvs", file=sys.stderr)
+        print("         echo 'print(sys.argv)' | pydebug-stdin --mode standalone script.py 5 -- arg1 arg2", file=sys.stderr)
+        sys.exit(1)
+    
+    file_path = args[0]
+    line_number = args[1]
+    
+    # Read command from stdin
+    command = sys.stdin.read().strip()
+    
+    if not command:
+        print("ERROR: No command provided via stdin", file=sys.stderr)
+        sys.exit(1)
+    
+    # Extract pytest args
+    pytest_args = []
+    if '--' in args:
+        sep_index = args.index('--')
+        pytest_args = args[sep_index + 1:]
+    
+    # Change to substrate root
+    substrate_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    os.chdir(substrate_root)
+    
+    # Make file path absolute if it isn't already
+    if not os.path.isabs(file_path):
+        file_path = os.path.abspath(file_path)
+    
+    # Build the command
+    cmd = [sys.executable, '-m', 'smart_debugger.smart_debugger']
+    
+    # Add mode flag if not default
+    if mode != 'pytest':
+        cmd.extend(['--mode', mode])
+    
+    # Add quiet flag
+    cmd.extend(quiet_flag)
+    
+    # Add module flag if needed
+    if is_module:
+        cmd.append('-m')
+    
+    # Add positional arguments
+    cmd.extend([file_path, line_number, command])
+    
+    # Add extra arguments
+    if pytest_args:
+        cmd.extend(['--'] + pytest_args)
+    
+    # Set PYTHONPATH
+    env = os.environ.copy()
+    env['PYTHONPATH'] = substrate_root
+    
+    # Run the debugger
+    result = subprocess.run(cmd, env=env)
+    sys.exit(result.returncode)

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Smart debugger wrapper script for easy debugging from anywhere
+
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Run the Python wrapper which handles multiline commands properly
+exec python3 "$SCRIPT_DIR/pydebug.py" "$@"
