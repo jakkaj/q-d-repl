@@ -3,7 +3,7 @@ Smart Debugger - Project-Agnostic Pytest Debugging Tool
 A standalone debugger for pytest that works with any Python project
 """
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -16,7 +16,8 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/example/smart-debugger",
-    packages=find_packages(),
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",

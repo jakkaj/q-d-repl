@@ -1,5 +1,6 @@
 """Very simple test for debugging."""
 
+
 def test_basic():
     """Simplest possible test."""
     x = 10

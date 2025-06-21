@@ -12,9 +12,9 @@ Usage:
     echo 'print(sys.argv)' | pydebug-stdin --mode standalone script.py 5 -- arg1 arg2
     echo 'print(data)' | pydebug-stdin --mode standalone -m module_name 10
 """
-import sys
 import os
 import subprocess
+import sys
 
 if __name__ == "__main__":
     args = sys.argv[1:]
@@ -72,9 +72,9 @@ if __name__ == "__main__":
         sep_index = args.index('--')
         pytest_args = args[sep_index + 1:]
     
-    # Change to substrate root
-    substrate_root = os.path.dirname(os.path.abspath(__file__))
-    os.chdir(substrate_root)
+    # Change to project root
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    os.chdir(project_root)
     
     # Make file path absolute if it isn't already
     if not os.path.isabs(file_path):
@@ -101,9 +101,14 @@ if __name__ == "__main__":
     if pytest_args:
         cmd.extend(['--'] + pytest_args)
     
-    # Set PYTHONPATH
+    # Set PYTHONPATH to include src directory
     env = os.environ.copy()
-    env['PYTHONPATH'] = substrate_root
+    src_path = os.path.join(project_root, "src")
+    existing_path = env.get("PYTHONPATH", "")
+    if existing_path:
+        env["PYTHONPATH"] = f"{src_path}:{existing_path}"
+    else:
+        env["PYTHONPATH"] = src_path
     
     # Run the debugger
     result = subprocess.run(cmd, env=env)

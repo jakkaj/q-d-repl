@@ -1,5 +1,6 @@
 """Test for quiet mode."""
 
+
 def test_quiet():
     """Simple test for quiet mode."""
     x = 42
