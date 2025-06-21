@@ -90,7 +90,7 @@ The existing `process_legacy()` method (formerly `process()`) is retained for ba
 
 ## Testing
 
-Comprehensive tests are provided in `/workspaces/substrate/smart_debugger/tests/test_smart_content_repo_interface.py` that verify:
+Comprehensive tests are provided in `/workspaces/q-d-repl/tests/test_smart_content_repo_interface.py` that verify:
 
 - Objects are updated in-place (same object IDs before and after)
 - Elements with up-to-date smart content are skipped

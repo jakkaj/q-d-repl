@@ -16,7 +16,7 @@ def test_quiet_mode_shows_only_repl_output():
     
     # Run with quiet mode
     cmd = [
-        sys.executable, "-m", "smart_debugger.smart_debugger",
+        sys.executable, "-m", "smart_debugger",
         "--quiet",
         str(test_file), "9", 'print("QUIET_OUTPUT: 42")',
         "--", "-s"
@@ -47,7 +47,7 @@ def test_quiet_mode_shows_repl_errors():
     
     # Run with an undefined variable
     cmd = [
-        sys.executable, "-m", "smart_debugger.smart_debugger",
+        sys.executable, "-m", "smart_debugger",
         "--quiet",
         str(test_file), "9", 'print(undefined_variable)',
         "--", "-s"
@@ -71,7 +71,7 @@ def test_normal_mode_shows_all_output():
     
     # Run without quiet mode
     cmd = [
-        sys.executable, "-m", "smart_debugger.smart_debugger",
+        sys.executable, "-m", "smart_debugger",
         str(test_file), "9", 'print("NORMAL_OUTPUT: 42")',
         "--", "-s"
     ]
@@ -108,7 +108,7 @@ def test_will_fail():
     try:
         # Run with quiet mode on a line after the assertion
         cmd = [
-            sys.executable, "-m", "smart_debugger.smart_debugger",
+            sys.executable, "-m", "smart_debugger",
             "--quiet",
             str(failing_test), "6", 'print("Should not reach here")',
             "--", "-s"
@@ -137,7 +137,7 @@ def test_quiet_mode_complex_output():
     
     # Run with multiline output
     cmd = [
-        sys.executable, "-m", "smart_debugger.smart_debugger",
+        sys.executable, "-m", "smart_debugger",
         "--quiet",
         str(test_file), "9", '''print("""Line 1
 Line 2
@@ -168,7 +168,7 @@ def test_version_banner_always_shows():
     # Test both modes
     for quiet_flag in ["--quiet", ""]:
         cmd = [
-            sys.executable, "-m", "smart_debugger.smart_debugger",
+            sys.executable, "-m", "smart_debugger",
         ]
         if quiet_flag:
             cmd.append(quiet_flag)

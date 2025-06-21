@@ -7,7 +7,7 @@
 ```mermaid
 graph LR
     subgraph "LLM Agent Input"
-        A[LLM Command] --> B["python3 -m smart_debugger<br/>test_file.py 42 'print(x)' -- -v"]
+        A[LLM Command] --> B["pydebug<br/>test_file.py 42 'print(x)' -- -v"]
     end
     
     subgraph "Execution"
@@ -175,7 +175,7 @@ Use the `--quiet` or `-q` flag to enable quiet mode:
 
 #### Normal Mode Output
 ```bash
-$ python3 -m smart_debugger test_example.py 42 "print(result)"
+$ pydebug test_example.py 42 "print(result)"
 ============================= test session starts ==============================
 platform linux -- Python 3.11.2, pytest-8.3.3, pluggy-1.5.0
 rootdir: /path/to/project
@@ -192,13 +192,13 @@ Smart Debugger v1.2.0 - Non-interactive debugging for LLM agents
 
 #### Quiet Mode Output
 ```bash
-$ python3 -m smart_debugger --quiet test_example.py 42 "print(result)"
+$ pydebug --quiet test_example.py 42 "print(result)"
 {'key': 'value'}
 ```
 
 With stderr visible:
 ```bash
-$ python3 -m smart_debugger --quiet test_example.py 42 "print(result)" 2>&1
+$ pydebug --quiet test_example.py 42 "print(result)" 2>&1
 {'key': 'value'}
 Smart Debugger v1.2.0 - Non-interactive debugging for LLM agents
 Breakpoint hit: test_example.py:42
@@ -226,20 +226,20 @@ echo 'print(x)' | pydebug-stdin --quiet tests/test_example.py 42 -- -v
 2. **Scripting and Automation**
    ```bash
    # Get just the value for use in a script
-   value=$(python3 -m smart_debugger --quiet test.py 42 "print(data['count'])")
+   value=$(pydebug --quiet test.py 42 "print(data['count'])")
    echo "Count is: $value"
    ```
 
 3. **Piping to Other Tools**
    ```bash
    # Pipe JSON output directly to jq
-   python3 -m smart_debugger --quiet test.py 42 "import json; print(json.dumps(data))" | jq .
+   pydebug --quiet test.py 42 "import json; print(json.dumps(data))" | jq .
    ```
 
 4. **Clean Output for Documentation**
    ```bash
    # Get clean output for examples
-   python3 -m smart_debugger --quiet test.py 42 "print(f'Result: {result}')"
+   pydebug --quiet test.py 42 "print(f'Result: {result}')"
    # Output: Result: 42
    ```
 
@@ -248,14 +248,14 @@ echo 'print(x)' | pydebug-stdin --quiet tests/test_example.py 42 -- -v
 If your REPL command doesn't produce any output, quiet mode will show a warning on stderr:
 
 ```bash
-$ python3 -m smart_debugger --quiet test.py 42 "x = 5"  # No print statement
+$ pydebug --quiet test.py 42 "x = 5"  # No print statement
 $ echo $?  # Exit code is still 0
 0
 ```
 
 With stderr:
 ```bash
-$ python3 -m smart_debugger --quiet test.py 42 "x = 5" 2>&1
+$ pydebug --quiet test.py 42 "x = 5" 2>&1
 Smart Debugger v1.2.0 - Non-interactive debugging for LLM agents
 Breakpoint hit: test.py:42
 Warning: No output captured from REPL command

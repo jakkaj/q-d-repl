@@ -371,7 +371,7 @@ echo 'print(var)' | pydebug-stdin --quiet test.py 10 -- -k specific_test_name -x
 ### Import Errors
 If you get "ModuleNotFoundError: No module named 'src'":
 ```bash
-# The pydebug commands automatically set PYTHONPATH to /workspaces/substrate
+# The pydebug commands automatically set PYTHONPATH to /workspaces/q-d-repl
 # This should work without additional configuration
 echo 'print(var)' | pydebug-stdin --quiet tests/test.py 10 -- -xvs
 ```

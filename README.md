@@ -89,7 +89,7 @@ print(df.head())' | \
 
 ```bash
 # Add to your PATH (or use absolute paths)
-export PATH="/path/to/smart_debugger:$PATH"
+export PATH="/workspaces/q-d-repl:$PATH"
 ```
 
 ### Basic Usage
@@ -310,11 +310,11 @@ To make the debugger available system-wide:
 
 ```bash
 # Add to your shell profile (.bashrc, .zshrc, etc.)
-export PATH="/path/to/smart_debugger:$PATH"
+export PATH="/workspaces/q-d-repl:$PATH"
 
 # Or create symbolic links
-ln -s /path/to/smart_debugger/pydebug /usr/local/bin/pydebug
-ln -s /path/to/smart_debugger/pydebug-stdin /usr/local/bin/pydebug-stdin
+ln -s /workspaces/q-d-repl/pydebug /usr/local/bin/pydebug
+ln -s /workspaces/q-d-repl/pydebug-stdin /usr/local/bin/pydebug-stdin
 ```
 
 ## Advanced Usage

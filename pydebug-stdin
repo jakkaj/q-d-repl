@@ -73,7 +73,7 @@ if __name__ == "__main__":
         pytest_args = args[sep_index + 1:]
     
     # Change to substrate root
-    substrate_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    substrate_root = os.path.dirname(os.path.abspath(__file__))
     os.chdir(substrate_root)
     
     # Make file path absolute if it isn't already
@@ -81,7 +81,7 @@ if __name__ == "__main__":
         file_path = os.path.abspath(file_path)
     
     # Build the command
-    cmd = [sys.executable, '-m', 'smart_debugger.smart_debugger']
+    cmd = [sys.executable, '-m', 'smart_debugger']
     
     # Add mode flag if not default
     if mode != 'pytest':
