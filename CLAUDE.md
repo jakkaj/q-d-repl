@@ -9,50 +9,91 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - ❌ **DO NOT** insert `import pdb; pdb.set_trace()` or similar debugger calls
 - ❌ **DO NOT** modify test files with debug output
 - ❌ **DO NOT** run debug commands from terminal like `python3 -m pdb`
-- ✅ **ALWAYS** use `pydebug-stdin` with stdin piping for reliable debugging
+- ✅ **ALWAYS** use `pydebug-stdin` with the `-f` file parameter for reliable debugging
 - ✅ **ALWAYS** use the `--quiet` flag to minimize output for LLM agents
 - ✅ **SUPPORTS** both pytest tests and standalone Python scripts/modules
 
 ### How to Debug Tests and Code
 
-**PREFERRED METHOD**: Use `pydebug-stdin` with stdin piping for maximum reliability and flexibility.
+**MOST PREFERRED METHOD**: Use `pydebug-stdin` with the `-f` file parameter for maximum reliability and flexibility. Debug production code by running tests that exercise it.
 
 **Basic Pattern:**
+```bash
+# MOST PREFERRED: Use the debug script file parameter
+# First write the file then run. You place breakpoint in the file you want, then you run the test that calls that file.
+# It's best to run from tests so you isolate the code.
+pydebug-stdin --quiet -f scratch/debug.py src/modules/condense.py 150 -- tests/test_smart_content/test_integration_pipeline.py::TestSmartContentIntegrationPipeline::test_complete_pipeline_with_real_llm -v
+
+# Step-by-step:
+# 1. Write debug commands to a file
+echo "print(variable_name)" > scratch/debug.py
+
+# 2. Use the debug script file with test-driven approach
+pydebug-stdin -f scratch/debug.py [--mode MODE] --quiet file.py line_number -- test_file.py::test_name -v
+```
+
+**Alternative Method (stdin piping for quick checks):**
 ```bash
 echo "command" | pydebug-stdin [--mode MODE] --quiet file.py line_number
 ```
 
 **Debugging Tests (default mode):**
 ```bash
-# Simple variable inspection in a test
-echo "print(variable_name)" | pydebug-stdin --quiet /path/to/test_file.py 42
+# MOST PREFERRED: Test-driven debugging with file parameter
+# Step 1: Create debug script
+cat > scratch/debug_data.py << 'EOF'
+import json
+print("=== Debug Output ===")
+print(f'Type: {type(data)}, Length: {len(data) if hasattr(data, "__len__") else "N/A"}')
+print(f'Value: {data}')
+if hasattr(data, '__dict__'):
+    print("Object attributes:")
+    print(json.dumps(vars(data), indent=2))
+EOF
 
-# Complex expressions in test context
-echo "print(f'Type: {type(data)}, Value: {data}')" | pydebug-stdin --quiet tests/test_example.py 60
+# Step 2: Debug production code by running test that exercises it
+pydebug-stdin -f scratch/debug_data.py --quiet src/data_processor.py 60 -- tests/test_data_processor.py::test_process_data -v
+
+# Alternative: Quick inspection with stdin piping
+echo "print(variable_name)" | pydebug-stdin --quiet /path/to/test_file.py 42
 ```
 
 **Debugging Standalone Python Scripts:**
 ```bash
-# Debug a standalone Python script
+# MOST PREFERRED: Debug production code through tests
+# Step 1: Create comprehensive debug script
+cat > scratch/debug_module.py << 'EOF'
+import json
+import sys
+print("=== Module Debug Info ===")
+print(f"Python path: {sys.path[0]}")
+print(f"Arguments: {sys.argv}")
+if 'config' in locals():
+    print(f"Config loaded: {json.dumps(config, indent=2)}")
+print(f"Local variables: {list(locals().keys())}")
+EOF
+
+# Step 2: Debug by running test that exercises the module
+pydebug-stdin --quiet -f scratch/debug_module.py src/modules/condense.py 150 -- tests/test_smart_content/test_integration_pipeline.py::TestSmartContentIntegrationPipeline::test_complete_pipeline_with_real_llm -v
+
+# Alternative: Direct standalone debugging (when test approach not applicable)
 echo "print(config)" | pydebug-stdin --mode standalone --quiet /path/to/script.py 42
-
-# Debug with script arguments
-echo "print(sys.argv)" | pydebug-stdin --mode standalone --quiet script.py 10 -- --arg1 value1
-
-# Debug a Python module
-echo "print(locals())" | pydebug-stdin --mode standalone -m mymodule --quiet 30
-
-# JSON-formatted output for structured data
-echo "import json; print(json.dumps(result_dict, indent=2))" | pydebug-stdin --mode standalone --quiet src/module.py 75
 ```
 
-**Why stdin method is preferred:**
-- Handles multiline commands reliably without shell escaping issues
-- Avoids terminal line-wrapping problems with long expressions
-- Better for complex expressions and JSON formatting
-- More robust and predictable for LLM agent usage
-- Eliminates quoting and escaping complexities
-- Works with ANY Python code: tests, scripts, modules, packages
+**Why file parameter (-f) is MOST preferred:**
+- **Test-driven debugging**: Debug production code safely by running tests that exercise it
+- **Isolation**: Tests provide controlled environment for debugging
+- **Complex debugging**: Write sophisticated multiline debug scripts
+- **Reusability**: Save debug scripts in `scratch/` for repeated use
+- **No shell escaping**: Avoid quote and escape character issues
+- **Version control**: Track and share debug approaches
+- **Production safety**: Never debug production directly, always through tests
+
+**When to use stdin method:**
+- Quick one-line variable checks
+- Simple print statements
+- When piping from other commands
+- Exploratory debugging
 
 The `pydebug-stdin` tool will:
 - Set breakpoints automatically at the specified line
@@ -61,16 +102,54 @@ The `pydebug-stdin` tool will:
 - Exit cleanly without requiring interaction
 - Support both pytest test debugging and standalone Python debugging
 
-#### Stdin Method with Quiet Mode (Preferred for LLM Agents)
+#### File Parameter with Quiet Mode (Most Preferred for LLM Agents)
 
-**IMPORTANT**: LLM agents should ALWAYS use `pydebug-stdin --quiet` by default to save context space and ensure reliable command execution.
+**IMPORTANT**: LLM agents should ALWAYS use `pydebug-stdin -f scratch/debug.py --quiet` with test-driven debugging by default. This ensures reliable command execution and production code safety.
 
-**Basic stdin pattern with quiet mode:**
+**Basic file parameter pattern with quiet mode:**
 ```bash
-echo "print(variable_name)" | pydebug-stdin --quiet file.py line_number
+# Step 1: Write debug command to scratch directory
+echo "print(variable_name)" > scratch/debug.py
+
+# Step 2: Debug production code through test execution
+pydebug-stdin -f scratch/debug.py --quiet src/module.py line_number -- tests/test_module.py::test_case -v
 ```
 
-**Advanced stdin examples:**
+**Advanced file parameter examples:**
+```bash
+# MOST PREFERRED: Comprehensive debug script for production code
+cat > scratch/debug_analysis.py << 'EOF'
+import json
+import traceback
+
+print("=== Debug Analysis ===")
+print(f"Call stack:")
+for line in traceback.format_stack()[-3:-1]:
+    print(line.strip())
+
+# Analyze the data structure
+if 'data' in locals():
+    print(f"\nData type: {type(data).__name__}")
+    print(f"Data length: {len(data) if hasattr(data, '__len__') else 'N/A'}")
+    print("\nData contents:")
+    try:
+        print(json.dumps(data, indent=2, default=str))
+    except:
+        print(repr(data)[:500])
+EOF
+
+# Debug production code through test
+pydebug-stdin -f scratch/debug_analysis.py --quiet src/processor.py 42 -- tests/test_processor.py::test_data_processing -v
+```
+
+#### Alternative: Stdin Method with Quiet Mode (For Quick Checks)
+
+**When to use stdin instead of file parameter:**
+- Quick one-line debugging commands
+- Piping output from other tools
+- Dynamic command generation in scripts
+
+**Stdin examples:**
 ```bash
 # Multiple statements (semicolon-separated)
 echo "import json; print(json.dumps(data, indent=2))" | pydebug-stdin --quiet tests/test_example.py 42
@@ -110,7 +189,7 @@ Warning: No output captured from REPL command
 - When debugging test discovery issues
 - When you need to see the complete test execution flow
 
-For 99% of debugging tasks, `pydebug-stdin --quiet` provides all necessary information while conserving valuable token space.
+For 99% of debugging tasks, `pydebug-stdin -f scratch/debug.py --quiet` with test-driven debugging provides the most reliable and safe approach while conserving valuable token space.
 
 ## Project Overview
 
@@ -167,6 +246,11 @@ just debug-example
 just debug-loop
 
 # Direct usage for custom debugging
+# MOST PREFERRED: File parameter with test-driven approach
+echo "print(variable)" > scratch/debug.py
+pydebug-stdin --quiet -f scratch/debug.py src/module.py 42 -- tests/test_module.py::test_case -v
+
+# Alternative: Stdin for quick checks
 echo "print(variable)" | pydebug-stdin --quiet tests/test_file.py 42 -- -v
 ```
 
@@ -178,7 +262,7 @@ echo "print(variable)" | pydebug-stdin --quiet tests/test_file.py 42 -- -v
   - `non_interactive.py` - Core debugging logic
   - `standalone.py` - Standalone Python script support
 - `pydebug` - Global command wrapper
-- `pydebug-stdin` - Stdin-based command wrapper (preferred)
+- `pydebug-stdin` - Command wrapper supporting both file parameter and stdin
 - `tests/` - Test suite with sample projects
 - `examples/` - Usage examples and patterns
 
@@ -201,28 +285,52 @@ def my_function():
     print(f"DEBUG: result={result}")  # DON'T DO THIS
     return result
 
-# ✅ CORRECT - Use pydebug-stdin with stdin piping:
-echo "print(f'result={result}')" | pydebug-stdin --quiet src/my_module.py 45
+# ✅ CORRECT - Use pydebug-stdin with file parameter and test-driven debugging:
+# Step 1: Write debug script
+echo "print(f'result={result}')" > scratch/debug_result.py
+# Step 2: Debug by running test that exercises this code
+pydebug-stdin --quiet -f scratch/debug_result.py src/my_module.py 45 -- tests/test_my_module.py::test_calculate -v
 ```
 
 #### Common Debugging Scenarios
 
 **Test Debugging (pytest mode - default):**
 ```bash
-# Test failure investigation
-echo "print({k: type(v).__name__ for k, v in locals().items() if not k.startswith('_')})" | pydebug-stdin --quiet tests/test_example.py 60
+# MOST PREFERRED: Test failure investigation using file parameter
+# Step 1: Create comprehensive debug script
+cat > scratch/debug_locals.py << 'EOF'
+print("=== Local Variables ===")
+for k, v in locals().items():
+    if not k.startswith('_'):
+        print(f"{k}: {type(v).__name__} = {repr(v)[:100]}")
+EOF
 
-# Data structure analysis in tests
+# Step 2: Debug production code through the failing test
+pydebug-stdin --quiet -f scratch/debug_locals.py src/parser.py 60 -- tests/test_parser.py::test_parse_data -v
+
+# Alternative: Quick inspection with stdin
 echo "print(f'Type: {type(parsed_data)}, Contents: {parsed_data}')" | pydebug-stdin --quiet tests/test_parser.py 42
 ```
 
 **Standalone Python Debugging:**
 ```bash
-# Debug a CLI script
-echo "print(f'Args: {args}, Config: {config}')" | pydebug-stdin --mode standalone --quiet cli_script.py 45 -- --verbose --config prod.json
+# MOST PREFERRED: Debug production CLI through integration tests
+# Step 1: Create debug script for CLI
+cat > scratch/debug_cli.py << 'EOF'
+import json
+print("=== CLI Debug Info ===")
+if 'args' in locals():
+    print(f"Arguments: {vars(args)}")
+if 'config' in locals():
+    print(f"Config: {json.dumps(config, indent=2)}")
+print(f"Local vars: {list(locals().keys())}")
+EOF
 
-# Debug a Python module
-echo "import json; print(json.dumps(module_state, indent=2))" | pydebug-stdin --mode standalone -m mypackage.module --quiet 30
+# Step 2: Debug through CLI integration test
+pydebug-stdin --quiet -f scratch/debug_cli.py src/cli_script.py 45 -- tests/test_cli_integration.py::test_production_config -v
+
+# Alternative: Direct debugging when test approach not suitable
+echo "print(f'Args: {args}, Config: {config}')" | pydebug-stdin --mode standalone --quiet cli_script.py 45 -- --verbose --config prod.json
 ```
 
 ### Code Quality Standards
@@ -268,19 +376,77 @@ echo 'print("Hello from debugger!")' | pydebug-stdin --help
 
 ### Debug Test Failures
 ```bash
-# Inspect failing test variables
+# MOST PREFERRED: Debug production code through failing test
+# Step 1: Create debug script
+cat > scratch/debug_test_failure.py << 'EOF'
+print("=== Test Failure Debug ===")
+if 'expected' in locals() and 'actual' in locals():
+    print(f"Expected: {expected}")
+    print(f"Actual: {actual}")
+    print(f"Types: expected={type(expected).__name__}, actual={type(actual).__name__}")
+    if expected != actual:
+        print("Difference detected!")
+else:
+    print("Variables 'expected' or 'actual' not found in scope")
+    print(f"Available variables: {list(locals().keys())}")
+EOF
+
+# Step 2: Debug the production code through the failing test
+pydebug-stdin --quiet -f scratch/debug_test_failure.py src/auth.py 125 -- tests/test_auth.py::test_authentication -v
+
+# Alternative: Quick inspection
 echo 'print(f"expected={expected}, actual={actual}")' | pydebug-stdin --quiet tests/test_auth.py 25 -- -v
 ```
 
 ### Debug Standalone Scripts
 ```bash
-# Debug data processing script
+# MOST PREFERRED: Debug data processing through tests
+# Step 1: Create debug script
+cat > scratch/debug_data_processing.py << 'EOF'
+print("=== Data Processing Debug ===")
+if 'data' in locals():
+    if hasattr(data, 'shape'):
+        print(f"Data shape: {data.shape}")
+    if hasattr(data, 'columns'):
+        print(f"Columns: {list(data.columns)}")
+        print(f"Data types:\n{data.dtypes}")
+    if hasattr(data, 'head'):
+        print(f"First 5 rows:\n{data.head()}")
+else:
+    print("Variable 'data' not found")
+    print(f"Available: {list(locals().keys())}")
+EOF
+
+# Step 2: Debug through integration test
+pydebug-stdin --quiet -f scratch/debug_data_processing.py src/process_data.py 80 -- tests/test_data_processing.py::test_csv_processing -v
+
+# Alternative: Direct script debugging
 echo 'print(f"data shape: {data.shape}, columns: {list(data.columns)}")' | pydebug-stdin --mode standalone --quiet process_data.py 80 -- input.csv
 ```
 
 ### Debug Python Modules
 ```bash
-# Debug module execution
+# MOST PREFERRED: Debug module through tests
+# Step 1: Create debug script
+cat > scratch/debug_module_config.py << 'EOF'
+import json
+print("=== Module Configuration Debug ===")
+if 'config' in locals():
+    print(f"Config type: {type(config).__name__}")
+    if isinstance(config, dict):
+        print(f"Environment: {config.get('env', 'not set')}")
+        print(f"Full config: {json.dumps(config, indent=2, default=str)}")
+    else:
+        print(f"Config value: {config}")
+else:
+    print("Variable 'config' not found")
+    print(f"Available: {list(locals().keys())}")
+EOF
+
+# Step 2: Debug through module test
+pydebug-stdin --quiet -f scratch/debug_module_config.py src/myapp/main.py 30 -- tests/test_main.py::test_production_config -v
+
+# Alternative: Direct module debugging
 echo 'print(f"config loaded: {config}")' | pydebug-stdin -m myapp.main --quiet 30 -- --env production
 ```
 
@@ -313,10 +479,12 @@ test: add integration tests for quiet mode functionality
 ## Best Practices
 
 ### For LLM Agents
+- **Always use `-f scratch/debug.py` file parameter** for debugging
 - **Always use `--quiet` mode** for clean, minimal output
-- **Prefer `pydebug-stdin`** over direct command for reliability
+- **Debug production code through tests** for safety and isolation
+- **Write debug scripts to `scratch/` directory** for organization
 - **Use JSON formatting** for structured data inspection
-- **Combine multiple statements** with semicolons when needed
+- **Prefer test-driven debugging** to isolate and exercise specific code paths
 
 ### For Developers
 - **Never modify source files** for debugging
@@ -354,7 +522,9 @@ test: add integration tests for quiet mode functionality
 - Start with simple commands like `print(locals())` to see available variables
 - Use `type()` and `dir()` to understand object structure
 - Leverage `json.dumps()` for complex data visualization
-- Always use stdin method with quiet mode for LLM efficiency
+- Always use file parameter (-f) with quiet mode for complex debugging
+- Debug production code through tests for safety and reliability
+- Use stdin method only for quick one-liners
 
 ## Contributing
 

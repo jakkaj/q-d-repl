@@ -2,14 +2,32 @@
 
 ## Overview
 
-This plan details how to implement the `-f` file parameter feature for the Smart Debugger from scratch. The feature allows users to specify debug commands via a file instead of command-line arguments or stdin piping.
+This plan details how to implement the `-f` file parameter feature for the Smart Debugger. The feature allows users to specify debug commands via a file instead of command-line arguments or stdin piping.
+
+## Example Usage Pattern
+
+```bash
+# Write debug commands to a file
+echo "print(f'Config: {config}')" > scratch/debug.py
+
+# Use the debug script file with pydebug-stdin
+pydebug-stdin --quiet -f scratch/debug.py src/modules/condense.py 150 -- tests/test_integration.py::TestClass::test_method -v
+```
+
+### Why This Pattern is Powerful
+
+1. **Separation of Concerns**: Debug commands are separate from the debugging invocation
+2. **Complex Commands**: File allows multiline debug scripts without shell escaping issues
+3. **Reusability**: Save and reuse debug scripts for common debugging scenarios
+4. **Version Control**: Debug scripts can be tracked, shared, and reviewed
+5. **Testing Integration**: Run tests that exercise specific code paths while debugging
 
 ## Goals
 
-- Add `-f` and `--file` parameter support to both `pydebug.py` and `pydebug-stdin` wrappers
+- Add `-f` and `--file` parameter support to both `src/pydebug.py` and `src/pydebug-stdin` wrappers
 - Maintain full backward compatibility with existing functionality
 - Provide robust error handling for file operations
-- Create comprehensive test coverage
+- Create comprehensive test coverage including the exact usage pattern above
 - Update documentation to promote file parameter as preferred method
 
 ## Architecture Overview
@@ -17,7 +35,8 @@ This plan details how to implement the `-f` file parameter feature for the Smart
 ```
 User Input → Wrapper Scripts → smart_debugger CLI → Debugger Classes
      ↓              ↓                   ↓              ↓
--f file.py    Parse flags        Pass command    Execute at breakpoint
+-f debug.py    Parse flags        Pass command    Execute at breakpoint
+                Read file
 ```
 
 ---
@@ -28,10 +47,10 @@ User Input → Wrapper Scripts → smart_debugger CLI → Debugger Classes
 
 | #   | Status | Task | Success Criteria | Notes |
 |-----|--------|------|------------------|-------|
-| 1.1 | [ ] | Analyze wrapper script structure | Document current argument flow and parsing logic | Map pydebug.py and pydebug-stdin |
+| 1.1 | [ ] | Analyze wrapper script structure | Document current argument flow and parsing logic | Map src/pydebug.py and src/pydebug-stdin |
 | 1.2 | [ ] | Review existing flag parsing | Understand how --mode, --quiet, -m are handled | Identify insertion point for -f |
 | 1.3 | [ ] | Document argument flow | Create diagram of data flow from user to debugger | Include all transformation steps |
-| 1.4 | [ ] | Identify integration points | Find where new file reading logic should be added | Minimize code duplication |
+| 1.4 | [ ] | Identify integration points | Find where new file reading logic should be added | After flag parsing, before stdin read |
 
 ---
 
@@ -39,17 +58,17 @@ User Input → Wrapper Scripts → smart_debugger CLI → Debugger Classes
 
 **Objective**: Add file parameter parsing and reading to both wrapper scripts
 
-### Task 2.1: Update pydebug.py wrapper
+### Task 2.1: Update src/pydebug.py wrapper
 | #   | Status | Task | Success Criteria | Notes |
 |-----|--------|------|------------------|-------|
-| 2.1.1 | [ ] | Add -f/--file flag parsing | Both -f and --file work with proper validation | Insert after existing flag parsing |
+| 2.1.1 | [ ] | Add -f/--file flag parsing | Both -f and --file work with proper validation | Insert after line 42 (after quiet mode check) |
 | 2.1.2 | [ ] | Implement file reading logic | Read command from file with error handling | Handle UTF-8 encoding |
 | 2.1.3 | [ ] | Adjust argument count validation | Correct expected args based on -f presence | 2 args if -f, 3 if not |
 | 2.1.4 | [ ] | Update usage messages | Clear help text showing both usage patterns | Show -f and non-f examples |
 
 **Implementation Details for 2.1:**
 ```python
-# Location: smart_debugger/pydebug.py (around line 40)
+# Location: src/pydebug.py (after line 42)
 
 # Check for -f/--file flag
 command_file = None
@@ -70,8 +89,13 @@ elif '--file' in args:
     args.pop(f_idx)  # Remove --file
     args.pop(f_idx)  # Remove file path
 
-# Adjust expected argument count
-expected_args = 2 if command_file else 3
+# Validate remaining arguments
+if command_file and len(args) < 2:
+    print("Usage: pydebug -f <command_file> <file> <line> -- [args]", file=sys.stderr)
+    return 1
+elif not command_file and len(args) < 3:
+    print("Usage: pydebug <file> <line> <command> -- [args]", file=sys.stderr)
+    return 1
 
 # File reading logic
 if command_file:
@@ -91,13 +115,13 @@ else:
     command = args[2]
 ```
 
-### Task 2.2: Update pydebug-stdin wrapper
+### Task 2.2: Update src/pydebug-stdin wrapper
 | #   | Status | Task | Success Criteria | Notes |
 |-----|--------|------|------------------|-------|
-| 2.2.1 | [ ] | Add identical -f/--file parsing | Same logic as pydebug.py | Reuse implementation pattern |
-| 2.2.2 | [ ] | Modify stdin vs file logic | Skip stdin reading when -f provided | File takes precedence |
-| 2.2.3 | [ ] | Update error messages | Consistent ERROR: prefix with pydebug-stdin style | Match existing style |
-| 2.2.4 | [ ] | Update usage and docstring | Show both stdin and file parameter usage | Include examples |
+| 2.2.1 | [ ] | Add identical -f/--file parsing | Same logic as pydebug.py | Insert after line 50 (after quiet mode check) |
+| 2.2.2 | [ ] | Modify stdin vs file logic | Skip stdin reading when -f provided | File takes precedence over stdin |
+| 2.2.3 | [ ] | Update error messages | Consistent "ERROR:" prefix style | Match existing pydebug-stdin style |
+| 2.2.4 | [ ] | Update usage and docstring | Show both stdin and file parameter usage | Include example from usage pattern |
 
 ### Task 2.3: Update docstrings and help
 | #   | Status | Task | Success Criteria | Notes |
@@ -153,10 +177,11 @@ except Exception as e:
 ### Task 4.1: Basic functionality tests
 | #   | Status | Task | Success Criteria | Notes |
 |-----|--------|------|------------------|-------|
-| 4.1.1 | [ ] | Test pydebug with -f parameter | Command from file executed correctly | Use standalone mode |
+| 4.1.1 | [ ] | Test pydebug with -f parameter | Command from file executed correctly | Use both pytest and standalone modes |
 | 4.1.2 | [ ] | Test pydebug with --file parameter | Long form flag works identically | Same test, different flag |
 | 4.1.3 | [ ] | Test pydebug-stdin with -f parameter | File overrides stdin input | No stdin reading |
 | 4.1.4 | [ ] | Test complex multiline commands | Elaborate debug scripts work | JSON, loops, imports |
+| 4.1.5 | [ ] | Test exact usage pattern | pydebug-stdin --quiet -f scratch/debug.py works | Match user's example |
 
 ### Task 4.2: Integration tests
 | #   | Status | Task | Success Criteria | Notes |
@@ -185,13 +210,14 @@ except Exception as e:
 
 **Test File Structure:**
 ```
-smart_debugger/tests/test_file_parameter.py
+tests/test_file_parameter.py
 ├── test_pydebug_with_file_parameter()
 ├── test_pydebug_with_long_file_parameter()
 ├── test_pydebug_stdin_with_file_parameter()
 ├── test_file_parameter_error_cases()
 ├── test_file_parameter_integration()
-└── test_backward_compatibility()
+├── test_backward_compatibility()
+└── test_exact_usage_pattern()  # Tests: pydebug-stdin --quiet -f scratch/debug.py
 ```
 
 ---
@@ -211,15 +237,15 @@ smart_debugger/tests/test_file_parameter.py
 ### Task 5.2: Update README files
 | #   | Status | Task | Success Criteria | Notes |
 |-----|--------|------|------------------|-------|
-| 5.2.1 | [ ] | Update smart_debugger/README.md | Add file parameter examples and benefits | User-focused |
+| 5.2.1 | [ ] | Update README.md if needed | Add file parameter examples and benefits | Main project README |
 | 5.2.2 | [ ] | Update LLM_AGENT_README.md | Comprehensive file parameter guide for LLMs | Technical detail |
 | 5.2.3 | [ ] | Update command-line help in scripts | Clear usage examples in --help output | Inline documentation |
 
 ### Task 5.3: Update project documentation
 | #   | Status | Task | Success Criteria | Notes |
 |-----|--------|------|------------------|-------|
-| 5.3.1 | [ ] | Update .clinerules if needed | Reflect file parameter preference | Consistency |
-| 5.3.2 | [ ] | Update debugrepl.md command | Show file parameter examples | Command reference |
+| 5.3.1 | [ ] | Add examples to justfile | Create debug-file command example | Show best practices |
+| 5.3.2 | [ ] | Update any other relevant docs | Show file parameter examples | Consistency |
 
 ---
 
@@ -230,9 +256,9 @@ smart_debugger/tests/test_file_parameter.py
 ### Task 6.1: Code quality
 | #   | Status | Task | Success Criteria | Notes |
 |-----|--------|------|------------------|-------|
-| 6.1.1 | [ ] | Run code formatting | black, isort on modified files | Consistent style |
-| 6.1.2 | [ ] | Run type checking | mypy if type hints used | Type safety |
-| 6.1.3 | [ ] | Run linting | flake8 on modified files | Code quality |
+| 6.1.1 | [ ] | Run code formatting | just fix on modified files | Use existing justfile commands |
+| 6.1.2 | [ ] | Run quality checks | just quality | Includes lint, format, type checking |
+| 6.1.3 | [ ] | Run all tests | just test | Ensure no regressions |
 
 ### Task 6.2: Manual testing
 | #   | Status | Task | Success Criteria | Notes |
@@ -304,6 +330,37 @@ def read_command_file(command_file: str) -> tuple[str, int]:
 4. **Test edge cases** - very long files, special characters, binary files
 5. **Maintain error message consistency** between both wrapper scripts
 
+### Example Test Case for Exact Usage Pattern
+
+```python
+def test_exact_usage_pattern(tmp_path):
+    """Test the exact usage pattern from the requirements."""
+    # Create a debug script file
+    debug_file = tmp_path / "scratch" / "debug.py"
+    debug_file.parent.mkdir(exist_ok=True)
+    debug_file.write_text('print(f"Config: {config}")')
+    
+    # Create a test file to debug
+    test_file = tmp_path / "src" / "modules" / "condense.py"
+    test_file.parent.mkdir(parents=True, exist_ok=True)
+    test_file.write_text('''
+def process_config(config):
+    # Line 150 would be here in real file
+    result = config.get('value', 'default')
+    return result
+''')
+    
+    # Run the exact command pattern
+    result = subprocess.run([
+        'pydebug-stdin', '--quiet', '-f', str(debug_file),
+        str(test_file), '150', '--',
+        'tests/test_integration.py::TestClass::test_method', '-v'
+    ], capture_output=True, text=True)
+    
+    assert result.returncode == 0
+    assert "Config:" in result.stdout
+```
+
 ---
 
 ## Success Criteria
@@ -329,13 +386,13 @@ def read_command_file(command_file: str) -> tuple[str, int]:
 
 ## Timeline Estimate
 
-- **Phase 1 (Analysis)**: 1-2 hours
-- **Phase 2 (Implementation)**: 3-4 hours  
-- **Phase 3 (Error Handling)**: 2-3 hours
-- **Phase 4 (Testing)**: 4-5 hours
-- **Phase 5 (Documentation)**: 2-3 hours
-- **Phase 6 (QA)**: 1-2 hours
+- **Phase 1 (Analysis)**: 30 minutes (architecture is well understood)
+- **Phase 2 (Implementation)**: 2-3 hours  
+- **Phase 3 (Error Handling)**: 1-2 hours
+- **Phase 4 (Testing)**: 3-4 hours
+- **Phase 5 (Documentation)**: 1-2 hours
+- **Phase 6 (QA)**: 1 hour
 
-**Total Estimated Time**: 13-19 hours
+**Total Estimated Time**: 8-12 hours
 
 This plan provides a comprehensive roadmap for implementing the `-f` file parameter feature while maintaining code quality, backward compatibility, and thorough documentation.

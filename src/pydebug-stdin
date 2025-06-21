@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """
-Smart debugger wrapper that reads REPL command from stdin.
-This allows for easy piping of multiline commands.
+Smart debugger wrapper that reads REPL command from stdin or file.
+This allows for easy piping of multiline commands or reading from debug script files.
 
 Usage:
-    # Pytest mode (default)
+    # Pytest mode (default) - from stdin
     echo 'print(variable)' | pydebug-stdin file.py 42 -- -xvs
     cat debug_cmd.py | pydebug-stdin file.py 42 -- -xvs
     
+    # Pytest mode - from file
+    pydebug-stdin -f debug_script.py file.py 42 -- -xvs
+    pydebug-stdin --quiet -f scratch/debug.py src/modules/condense.py 150 -- tests/test_integration.py::TestClass::test_method -v
+    
     # Standalone mode
     echo 'print(sys.argv)' | pydebug-stdin --mode standalone script.py 5 -- arg1 arg2
-    echo 'print(data)' | pydebug-stdin --mode standalone -m module_name 10
+    pydebug-stdin --mode standalone -f debug.py -m module_name 10
 """
 import os
 import subprocess
@@ -48,23 +52,64 @@ if __name__ == "__main__":
         quiet_flag = ['-q']
         args.remove('-q')
     
+    # Check for -f/--file flag
+    command_file = None
+    if '-f' in args:
+        f_idx = args.index('-f')
+        if f_idx + 1 >= len(args):
+            print("ERROR: -f flag requires a file path", file=sys.stderr)
+            sys.exit(1)
+        command_file = args[f_idx + 1]
+        args.pop(f_idx)  # Remove -f
+        args.pop(f_idx)  # Remove file path
+    elif '--file' in args:
+        f_idx = args.index('--file')
+        if f_idx + 1 >= len(args):
+            print("ERROR: --file flag requires a file path", file=sys.stderr)
+            sys.exit(1)
+        command_file = args[f_idx + 1]
+        args.pop(f_idx)  # Remove --file
+        args.pop(f_idx)  # Remove file path
+    
     if len(args) < 2:
         print("Usage: <command> | pydebug-stdin [--mode MODE] [--quiet|-q] [-m] <file> <line> -- [args]", file=sys.stderr)
+        print("   OR: pydebug-stdin [--mode MODE] [--quiet|-q] [-m] -f <command_file> <file> <line> -- [args]", file=sys.stderr)
         print("Modes: pytest (default), standalone", file=sys.stderr)
         print("Example: echo 'print(x)' | pydebug-stdin test.py 10 -- -xvs", file=sys.stderr)
-        print("         echo 'print(x)' | pydebug-stdin --quiet test.py 10 -- -xvs", file=sys.stderr)
+        print("         pydebug-stdin --quiet -f debug.py test.py 10 -- -xvs", file=sys.stderr)
         print("         echo 'print(sys.argv)' | pydebug-stdin --mode standalone script.py 5 -- arg1 arg2", file=sys.stderr)
         sys.exit(1)
     
     file_path = args[0]
     line_number = args[1]
     
-    # Read command from stdin
-    command = sys.stdin.read().strip()
-    
-    if not command:
-        print("ERROR: No command provided via stdin", file=sys.stderr)
-        sys.exit(1)
+    # Read command from file or stdin
+    if command_file:
+        try:
+            with open(command_file, 'r', encoding='utf-8') as f:
+                command = f.read().strip()
+            if not command:
+                print(f"ERROR: Command file {command_file} is empty", file=sys.stderr)
+                sys.exit(1)
+        except FileNotFoundError:
+            print(f"ERROR: Command file not found: {command_file}", file=sys.stderr)
+            sys.exit(1)
+        except PermissionError:
+            print(f"ERROR: Permission denied reading {command_file}", file=sys.stderr)
+            sys.exit(1)
+        except UnicodeDecodeError:
+            print(f"ERROR: Invalid encoding in {command_file}. Ensure file is UTF-8", file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:
+            print(f"ERROR: Error reading command file {command_file}: {e}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        # Read command from stdin
+        command = sys.stdin.read().strip()
+        
+        if not command:
+            print("ERROR: No command provided via stdin", file=sys.stderr)
+            sys.exit(1)
     
     # Extract pytest args
     pytest_args = []

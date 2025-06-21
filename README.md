@@ -101,7 +101,14 @@ pydebug test_file.py 42 "print(variable_name)"
 # Debug standalone Python scripts
 pydebug --mode standalone script.py 42 "print(variable_name)"
 
-# Complex debugging with stdin (recommended for complex expressions)
+# Complex debugging with file parameter (recommended for complex debugging)
+echo 'print(f"Value: {x}, Type: {type(x).__name__}")' > debug.py
+pydebug-stdin -f debug.py --quiet test_file.py 42
+
+# Production debugging pattern - debug source code by running tests
+pydebug-stdin --quiet -f scratch/debug.py src/modules/condense.py 150 -- tests/test_integration.py::TestClass::test_method -v
+
+# Inline debugging with stdin
 echo "print(f'Value: {x}, Type: {type(x).__name__}')" | pydebug-stdin test_file.py 42
 
 # Quiet mode for clean output (recommended for automation)
@@ -145,23 +152,87 @@ graph TD
 3. **Get Results**: The debugger runs your code, hits the breakpoint, executes your command, and exits
 4. **Clean Exit**: No interaction required, perfect for automation
 
-### Two Usage Methods
+### Three Usage Methods
 
-**Method 1: Direct Command (Simple Cases)**
+**Method 1: File Parameter (Recommended for Complex Debugging)**
 ```bash
-pydebug file.py 42 "print(variable)"
+# Write debug script
+echo 'print(variable)' > debug.py
+# Run with file parameter
+pydebug-stdin -f debug.py --quiet test.py 42 -- -v
 ```
 
-**Method 2: Stdin (Recommended for Complex Cases)**
+**Method 2: Stdin (Good for Inline Commands)**
 ```bash
 echo "print(variable)" | pydebug-stdin file.py 42
 ```
 
+**Method 3: Direct Command (Simple Cases Only)**
+```bash
+pydebug file.py 42 "print(variable)"
+```
+
+The file parameter method is recommended for:
+- Complex debugging sessions with multiple statements
+- Reusable debug scripts
+- Production debugging patterns
+- Avoiding shell escaping issues
+
 The stdin method is preferred for:
-- Multiline commands
-- Complex expressions with quotes
-- JSON formatting
-- Automated scripts
+- Quick one-line debugging
+- Multiline commands without saving to file
+- Automated scripts with dynamic commands
+
+Direct command is only for:
+- Very simple, single-line expressions
+- Quick interactive debugging
+
+### File Parameter Method in Detail
+
+The file parameter method (`-f` or `--file`) is the most powerful way to use Smart Debugger:
+
+```bash
+# Basic file parameter usage
+echo 'print(variable)' > debug.py
+pydebug-stdin -f debug.py --quiet test.py 42
+
+# Multiline debug script
+cat > debug_script.py << 'EOF'
+# Comprehensive debugging
+import json
+import pprint
+
+print("=== Debug Session ===")
+print(f"Available variables: {list(locals().keys())}")
+
+# Pretty print complex objects
+if 'data' in locals():
+    pprint.pprint(data)
+    
+# JSON output for structured data
+if 'config' in locals():
+    print(json.dumps(config, indent=2))
+EOF
+
+pydebug-stdin -f debug_script.py --quiet src/module.py 100
+```
+
+**Production Debugging Pattern:**
+```bash
+# Debug production code by running specific tests
+# This lets you set breakpoints in source code and run tests to hit them
+pydebug-stdin --quiet -f scratch/debug.py src/modules/condense.py 150 -- tests/test_integration.py::TestClass::test_method -v
+
+# Debug with multiple test scenarios
+pydebug-stdin --quiet -f debug_analysis.py src/api/handler.py 200 -- tests/test_api.py -k "error_handling or edge_case" -v
+```
+
+**Advantages of File Parameter:**
+- No shell escaping issues with quotes or special characters
+- Reusable debug scripts for common debugging patterns
+- Easy to version control debug scripts
+- Can include complex logic, imports, and multiline code
+- Perfect for production debugging scenarios
 
 ## Real-World Examples
 
@@ -172,6 +243,37 @@ echo 'print(f"Expected: {expected}")
 print(f"Actual: {actual}")
 print(f"Difference: {set(expected) - set(actual)}")' | \
   pydebug-stdin tests/test_example.py 85 --quiet
+```
+
+### Production Debugging with File Parameter
+```bash
+# Create a reusable debug script
+cat > debug_production.py << 'EOF'
+import json
+import sys
+
+# Inspect the current state
+print("=== Debug Information ===")
+print(f"Python version: {sys.version}")
+print(f"Local variables: {list(locals().keys())}")
+
+# Check specific variables if they exist
+if 'request' in locals():
+    print(f"Request method: {request.method}")
+    print(f"Request path: {request.path}")
+    print(f"Headers: {dict(request.headers)}")
+
+if 'response' in locals():
+    print(f"Response status: {response.status_code}")
+    print(f"Response data: {json.dumps(response.json(), indent=2)}")
+
+if 'error' in locals():
+    print(f"Error type: {type(error).__name__}")
+    print(f"Error message: {str(error)}")
+EOF
+
+# Debug production code by running specific test
+pydebug-stdin --quiet -f debug_production.py src/api/handlers.py 245 -- tests/test_api.py::TestAPIHandler::test_error_handling -v
 ```
 
 ### Data Structure Analysis (Standalone Mode)
@@ -197,9 +299,11 @@ print(f"Length: {len(data_structure)}")' | \
 ```bash
 pydebug [--quiet] [--mode MODE] [-m MODULE | FILE] <line> "<command>" [-- args]
 echo "<command>" | pydebug-stdin [--quiet] [--mode MODE] [-m MODULE | FILE] <line> [-- args]
+pydebug-stdin -f <debug_script> [--quiet] [--mode MODE] [-m MODULE | FILE] <line> [-- args]
 ```
 
 ### Options
+- `--file` or `-f`: Read debug commands from a file (recommended for complex debugging)
 - `--quiet` or `-q`: Show only command output (recommended for automation)
 - `--mode`: Execution mode: `pytest` (default) or `standalone`
 - `-m MODULE`: Run as module (like `python -m MODULE`) - only in standalone mode
@@ -212,6 +316,19 @@ pydebug test.py 42 "print(x)" -- -v
 
 # Debug standalone script with arguments
 pydebug --mode standalone script.py 30 "print(args)" -- --input=data.csv
+
+# Debug with file parameter for complex analysis
+cat > debug_analysis.py << 'EOF'
+import json
+print("Local variables:", {k: type(v).__name__ for k, v in locals().items()})
+if 'data' in locals():
+    print(f"Data type: {type(data)}")
+    print(f"Data sample: {json.dumps(data[:5], indent=2)}")
+EOF
+pydebug-stdin -f debug_analysis.py --quiet src/processor.py 75
+
+# Production debugging - debug source by running specific test
+pydebug-stdin --quiet -f scratch/inspect_state.py src/core/engine.py 200 -- tests/test_engine.py::test_state_handling -xvs
 
 # Debug module with quiet mode
 echo "print(config)" | pydebug-stdin -q --mode standalone -m my.app 50
@@ -242,6 +359,23 @@ Quiet mode reduces output by 90%+ making it ideal for automation and scripting.
 # Debug failing tests in CI without modifying code
 echo 'print("Debug info:", locals().keys())' | \
   pydebug-stdin --quiet tests/test_integration.py 100
+
+# Use file parameter for complex CI debugging
+cat > ci_debug.py << 'EOF'
+import os
+import json
+
+print(f"CI Environment: {os.environ.get('CI', 'Not in CI')}")
+print(f"Python path: {os.environ.get('PYTHONPATH', 'Not set')}")
+print(f"Current directory: {os.getcwd()}")
+print(f"Local variables: {list(locals().keys())}")
+
+# Check test-specific variables
+if 'pytest_config' in locals():
+    print(f"Pytest config: {pytest_config}")
+EOF
+
+pydebug-stdin -f ci_debug.py --quiet tests/test_integration.py 100
 ```
 
 ### Code Analysis Scripts
@@ -252,6 +386,27 @@ for line in 50 75 100; do
   echo "print(f'Line $line: {type(result).__name__}')" | \
     pydebug-stdin --quiet src/analyzer.py $line
 done
+
+# Or use a file for more complex analysis
+cat > analyze_types.py << 'EOF'
+import inspect
+
+def analyze_object(obj, name):
+    print(f"\n{name} Analysis:")
+    print(f"  Type: {type(obj).__name__}")
+    print(f"  Module: {inspect.getmodule(obj)}")
+    if hasattr(obj, '__dict__'):
+        print(f"  Attributes: {list(obj.__dict__.keys())[:5]}")
+
+# Analyze all objects in scope
+for var_name, var_value in locals().items():
+    if not var_name.startswith('_'):
+        analyze_object(var_value, var_name)
+EOF
+
+for line in 50 75 100; do
+  pydebug-stdin -f analyze_types.py --quiet src/analyzer.py $line
+done
 ```
 
 ### Development Workflow
@@ -259,17 +414,24 @@ done
 # Quick variable inspection during development
 alias debug-here='echo "print(locals())" | pydebug-stdin --quiet'
 debug-here myfile.py 42
+
+# Create a debug alias with file parameter for complex debugging
+alias debug-prod='pydebug-stdin --quiet -f ~/.debug_scripts/prod_debug.py'
+# Usage: debug-prod src/module.py 150 -- tests/test_module.py::specific_test -v
 ```
 
 ## Best Practices
 
 ### For Automation
 - Always use `--quiet` mode for scripts and automated systems
+- Use file parameter (`-f`) for reusable debug scripts
 - Prefer `pydebug-stdin` for complex expressions
 - Use JSON formatting for structured data output
 - Capture stderr for breakpoint confirmation
 
 ### For Development
+- Create debug script files in a `scratch/` directory for complex debugging
+- Use the production debugging pattern: debug source code by running specific tests
 - Use descriptive commands that explain what you're inspecting
 - Leverage Python's introspection capabilities (`type()`, `dir()`, `vars()`)
 - Combine with version control to track debugging sessions
@@ -278,6 +440,7 @@ debug-here myfile.py 42
 - Debug test failures without modifying test files
 - Use to inspect test data and fixtures
 - Combine with pytest markers and filters
+- Debug production code issues by setting breakpoints in source while running tests
 
 ## Troubleshooting
 
@@ -324,6 +487,58 @@ ln -s /workspaces/q-d-repl/pydebug-stdin /usr/local/bin/pydebug-stdin
 # Run with coverage and verbose output
 echo "print(coverage_data)" | \
   pydebug-stdin test.py 42 -- --cov=src --cov-report=term -v
+```
+
+### Complex Debugging Sessions with File Parameter
+```bash
+# Create a comprehensive debug script for analyzing a complex system
+cat > debug_comprehensive.py << 'EOF'
+import json
+import inspect
+import gc
+import sys
+
+print("=== System State Analysis ===")
+
+# Memory usage
+print(f"\nMemory objects by type:")
+type_counts = {}
+for obj in gc.get_objects():
+    type_name = type(obj).__name__
+    type_counts[type_name] = type_counts.get(type_name, 0) + 1
+
+top_types = sorted(type_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+for type_name, count in top_types:
+    print(f"  {type_name}: {count}")
+
+# Local state analysis
+print(f"\nLocal variables ({len(locals())} total):")
+for name, value in sorted(locals().items()):
+    if not name.startswith('_'):
+        print(f"  {name}: {type(value).__name__}")
+        if hasattr(value, '__len__'):
+            try:
+                print(f"    Length: {len(value)}")
+            except:
+                pass
+
+# Stack trace
+print(f"\nCall stack depth: {len(inspect.stack())}")
+for i, frame_info in enumerate(inspect.stack()[:5]):
+    print(f"  {i}: {frame_info.filename}:{frame_info.lineno} in {frame_info.function}")
+
+# Specific object analysis
+if 'target_object' in locals():
+    obj = locals()['target_object']
+    print(f"\nTarget object analysis:")
+    print(f"  Type: {type(obj)}")
+    print(f"  ID: {id(obj)}")
+    print(f"  Size: {sys.getsizeof(obj)} bytes")
+    print(f"  Attributes: {[a for a in dir(obj) if not a.startswith('_')][:10]}")
+EOF
+
+# Run comprehensive debugging on production code
+pydebug-stdin --quiet -f debug_comprehensive.py src/core/processor.py 350 -- tests/test_processor.py::test_memory_usage -v
 ```
 
 ### Complex Data Analysis (Standalone Mode)

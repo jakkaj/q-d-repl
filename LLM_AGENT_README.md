@@ -38,16 +38,17 @@ This tool allows LLM agents to:
 
 ## 🤖 Best Practices for LLM Agents
 
-### Always Use Stdin Method with Quiet Mode
+### Always Use File Parameter Method with Quiet Mode
 
-**IMPORTANT**: LLM agents should **always use the `pydebug-stdin` method with `--quiet` mode** as the default approach.
+**IMPORTANT**: LLM agents should **always use the file parameter method (`-f` or `--file`) with `--quiet` mode** as the default approach.
 
-#### Why Stdin Method + Quiet Mode?
-- **Reliable multiline command handling** - No shell escaping issues
+#### Why File Parameter Method + Quiet Mode?
+- **Separation of concerns** - Debug code separate from shell commands
+- **Reusable debug scripts** - Save and reuse complex debugging logic
+- **No escaping issues** - Write Python naturally without shell quoting
 - **Reduces output by 90%+** - Essential for staying within LLM context limits
 - **Clean, parseable output** - Ideal for automated analysis
-- **Perfect for complex expressions** - Handles nested quotes and formatting
-- **Better automation compatibility** - More predictable execution
+- **Better for production debugging** - Debug production code through tests
 - **Saves valuable tokens** - More room for actual problem-solving
 
 #### When to Use Normal Mode
@@ -58,7 +59,16 @@ This tool allows LLM agents to:
 ### Context Efficiency Examples
 
 ```bash
-# ✅ PREFERRED: Stdin method with quiet mode (saves ~90% context)
+# ✅ MOST PREFERRED: File parameter method with quiet mode (saves ~90% context)
+cat > /tmp/debug.py << 'EOF'
+print(f"Variable: {variable}")
+print(f"Type: {type(variable)}")
+EOF
+pydebug --quiet -f /tmp/debug.py test_file.py 42 -- -v
+# Output: Variable: {'key': 'value'}
+#         Type: <class 'dict'>
+
+# ✅ GOOD: Stdin method with quiet mode (for medium complexity)
 echo 'print(variable)' | pydebug-stdin --quiet test_file.py 42 -- -v
 # Output: {'key': 'value'}
 
@@ -74,9 +84,41 @@ echo 'print(variable)' | pydebug-stdin test_file.py 42 -- -v
 ## 🚀 Quick Start
 
 ### Global Commands Available
-The smart debugger is globally accessible via `pydebug-stdin` (preferred) and `pydebug` commands. Both support a `--quiet` or `-q` flag for clean output.
+The smart debugger is globally accessible via `pydebug` and `pydebug-stdin` commands. Both support a `--quiet` or `-q` flag for clean output, and `pydebug` supports a `-f` or `--file` parameter for file-based debugging.
 
-### Method 1: Using pydebug-stdin with echo (PREFERRED)
+### Method 1: Using file parameter with pydebug (MOST PREFERRED FOR LLMs)
+```bash
+# Template (with --quiet as default)
+cat > /tmp/debug.py << 'EOF'
+# Your debug code here
+print(variable)
+EOF
+pydebug --quiet -f /tmp/debug.py <test_file> <line_number> -- <pytest_args>
+
+# Simple example
+cat > /tmp/debug.py << 'EOF'
+print(f"x = {x}")
+print(f"Type: {type(x)}")
+EOF
+pydebug --quiet -f /tmp/debug.py tests/test_example.py 42 -- -v
+
+# Complex debugging for production code
+cat > /tmp/debug_prod.py << 'EOF'
+print("=== PRODUCTION CODE DEBUG ===")
+print(f"Input: {input_data}")
+print(f"Processing result: {result}")
+print(f"Expected: {expected}")
+print(f"Match: {result == expected}")
+
+import json
+if isinstance(result, (dict, list)):
+    print("\nJSON format:")
+    print(json.dumps(result, indent=2))
+EOF
+pydebug --quiet -f /tmp/debug_prod.py tests/test_production.py 55 -- -v
+```
+
+### Method 2: Using pydebug-stdin with echo (GOOD FOR MEDIUM COMPLEXITY)
 ```bash
 # Template (with --quiet as default)
 echo '<python_code>' | pydebug-stdin --quiet <test_file> <line_number> -- <pytest_args>
@@ -100,20 +142,78 @@ echo 'import json; print(json.dumps(data, indent=2))' | pydebug-stdin --quiet te
 echo 'print(x)' | pydebug-stdin tests/test_example.py 42 -- -v  # Full pytest output
 ```
 
-## ⭐ Why Stdin Method is Preferred
+## ⭐ Why File Parameter Method is Most Preferred for LLMs
 
-The `pydebug-stdin` method is the recommended approach because:
+The file parameter method (`-f` or `--file`) is the MOST recommended approach for LLM agents because:
 
-1. **Reliable Multiline Command Handling**: Perfect for complex expressions without shell escaping issues
-2. **No Terminal Line-Wrapping Interference**: Commands are processed as complete units
-3. **Perfect for Complex Expressions**: Handles nested quotes, multiline strings, and complex formatting
-4. **Better for LLM Automation**: More predictable parsing and execution
-5. **Avoids Shell Escaping Issues**: No need to worry about quote escaping in complex commands
+1. **Separation of Concerns**: Debug code is separate from shell commands
+2. **Reusability**: Debug scripts can be saved and reused across sessions
+3. **No Escaping Issues**: Write Python naturally without worrying about shell quoting
+4. **Production Debugging**: Safely debug production code through test breakpoints
+5. **Complex Logic Support**: Write multi-line debugging logic with proper formatting
+6. **Version Control Friendly**: Debug scripts can be tracked if needed
+7. **Better Error Messages**: Python syntax errors are clearer in files
 
-### Complex Examples Using Stdin Method
+### Debugging Production Code via Tests Pattern
+
 ```bash
-# Complex debugging with multiline output
-echo 'import json; print(json.dumps(data, indent=2))' | pydebug-stdin --quiet test.py 42 -- -v
+# Create a debug script to inspect production code behavior
+cat > /tmp/debug_prod.py << 'EOF'
+# This runs in the context of the test, which calls production code
+print("=== PRODUCTION CODE DEBUG ===")
+print(f"Function input: {input_data}")
+print(f"Expected output: {expected}")
+print(f"Actual output: {actual}")
+print(f"Match: {expected == actual}")
+if hasattr(actual, '__dict__'):
+    print(f"Actual object state: {vars(actual)}")
+EOF
+
+# Debug production code behavior through test
+pydebug --quiet -f /tmp/debug_prod.py tests/test_production.py 55 -- -v
+```
+
+## ⭐ When to Use Each Method
+
+### Use File Parameter Method When:
+- Debugging complex scenarios requiring multiple statements
+- Need reusable debugging logic
+- Debugging production code through tests
+- Working with structured data analysis
+- Need proper Python formatting without escaping
+
+### Use Stdin Method When:
+- Medium complexity commands (2-5 lines)
+- One-off debugging without reuse needs
+- Quick inspections with formatting
+
+### Use Direct Method When:
+- Simple one-line print statements
+- Basic variable inspection
+
+### Complex Examples Using File Parameter Method
+```bash
+# Complex debugging with structured output
+cat > /tmp/debug_data.py << 'EOF'
+import json
+import sys
+
+print("=== DATA STRUCTURE ANALYSIS ===")
+print(f"Type: {type(data).__name__}")
+print(f"Size: {sys.getsizeof(data)} bytes")
+
+if isinstance(data, dict):
+    print(f"Keys: {list(data.keys())}")
+    print("\nFormatted content:")
+    print(json.dumps(data, indent=2, default=str))
+elif isinstance(data, list):
+    print(f"Length: {len(data)}")
+    print(f"First item: {data[0] if data else 'Empty list'}")
+else:
+    print(f"Value: {data}")
+EOF
+
+pydebug --quiet -f /tmp/debug_data.py test.py 42 -- -v
 
 # Multiline inspection with formatted output
 echo 'print(f"""
@@ -130,7 +230,7 @@ echo 'print("\n".join([f"{k}: {type(v)} = {v}" for k, v in locals().items() if n
 echo 'print(f"Graph Analysis:\n  Nodes: {graph.number_of_nodes()}\n  Edges: {graph.number_of_edges()}\n  First 3 nodes: {list(graph.nodes())[:3]}")' | pydebug-stdin --quiet test_graph.py 64 -- -v
 ```
 
-### Method 2: Using pydebug directly (for simple commands only)
+### Method 3: Using pydebug directly (for simple commands only)
 ```bash
 # Template (with --quiet as default)
 pydebug --quiet <test_file> <line_number> '<python_code>' -- <pytest_args>
@@ -142,20 +242,7 @@ pydebug --quiet tests/test_example.py 42 'print(x)' -- -v
 pydebug tests/test_example.py 42 'print(x)' -- -v  # Full pytest output
 ```
 
-### Method 3: Using temporary file for very complex multiline commands
-```bash
-# Create debug script
-cat > /tmp/debug.py << 'EOF'
-print("=== DETAILED DEBUG ===")
-print(f"Variable type: {type(data)}")
-print(f"Variable value: {data}")
-import pprint
-pprint.pprint(data.__dict__)
-EOF
-
-# Run it (with --quiet for clean output)
-pydebug --quiet tests/test_example.py 42 "exec(open('/tmp/debug.py').read())" -- -v
-```
+Note: The file parameter method shown in Method 1 is the preferred approach over using `exec(open(...).read())`.
 
 ## 🔇 Quiet Mode (Essential for LLM Agents)
 
@@ -218,8 +305,11 @@ echo 'print(x)' | pydebug-stdin --quiet tests/test_example.py 42 -- -v
 
 1. **LLM Agent Debugging (PRIMARY USE CASE)**
    ```bash
-   # LLM agents should ALWAYS use --quiet to save context
-   pydebug --quiet test.py 42 "print(variable)"
+   # LLM agents should ALWAYS use --quiet with file parameter method
+   cat > /tmp/debug.py << 'EOF'
+   print(variable)
+   EOF
+   pydebug --quiet -f /tmp/debug.py test.py 42
    # Saves 90%+ of output tokens vs normal mode
    ```
 
@@ -265,7 +355,16 @@ Warning: No output captured from REPL command
 
 ### Inspect Variable Value
 ```bash
-# Preferred for LLM agents (stdin method + quiet mode)
+# Most preferred for LLM agents (file method + quiet mode)
+cat > /tmp/debug_user.py << 'EOF'
+print(f"User data: {user_data}")
+print(f"Data type: {type(user_data).__name__}")
+if hasattr(user_data, 'id'):
+    print(f"User ID: {user_data.id}")
+EOF
+pydebug --quiet -f /tmp/debug_user.py tests/test_user.py 25 -- -v
+
+# Good for medium complexity (stdin method + quiet mode)
 echo 'print(user_data)' | pydebug-stdin --quiet tests/test_user.py 25 -- -v
 
 # Complex variable inspection
@@ -277,7 +376,17 @@ echo 'print(user_data)' | pydebug-stdin tests/test_user.py 25 -- -v
 
 ### Check Type and Length
 ```bash
-# Preferred for LLM agents (stdin method + quiet mode)
+# Most preferred for LLM agents (file method + quiet mode)
+cat > /tmp/debug_items.py << 'EOF'
+print(f"Type: {type(items).__name__}")
+print(f"Length: {len(items)}")
+if items:
+    print(f"First item: {items[0]}")
+    print(f"Last item: {items[-1]}")
+EOF
+pydebug --quiet -f /tmp/debug_items.py tests/test_list.py 30 -- -v
+
+# Good for simple checks (stdin method + quiet mode)
 echo 'print(type(items), len(items))' | pydebug-stdin --quiet tests/test_list.py 30 -- -v
 
 # Detailed analysis with formatting
@@ -286,7 +395,17 @@ echo 'print(f"Items: {type(items).__name__} with {len(items)} elements")' | pyde
 
 ### Evaluate Expression
 ```bash
-# Preferred for LLM agents (stdin method + quiet mode)
+# Most preferred for LLM agents (file method + quiet mode)
+cat > /tmp/debug_math.py << 'EOF'
+print(f"x = {x}")
+print(f"y = {y}")
+print(f"Sum: {x + y}")
+print(f"Product: {x * y}")
+print(f"Division: {x / y if y != 0 else 'Division by zero'}")
+EOF
+pydebug --quiet -f /tmp/debug_math.py tests/test_math.py 18 -- -v
+
+# Good for simple evaluations (stdin method + quiet mode)
 echo 'print(x + y)' | pydebug-stdin --quiet tests/test_math.py 18 -- -v
 
 # Complex mathematical evaluation
@@ -298,7 +417,17 @@ result=$(echo 'print(x + y)' | pydebug-stdin --quiet tests/test_math.py 18 -- -v
 
 ### Access Object Attributes
 ```bash
-# Preferred for LLM agents (stdin method + quiet mode)
+# Most preferred for LLM agents (file method + quiet mode)
+cat > /tmp/debug_model.py << 'EOF'
+print("=== MODEL DEBUG ===")
+print(f"Name: {model.name}")
+print(f"Status: {model.status}")
+print(f"Type: {type(model).__name__}")
+print(f"Attributes: {[attr for attr in dir(model) if not attr.startswith('_')][:10]}")
+EOF
+pydebug --quiet -f /tmp/debug_model.py tests/test_model.py 45 -- -v
+
+# Good for simple access (stdin method + quiet mode)
 echo 'print(model.name, model.status)' | pydebug-stdin --quiet tests/test_model.py 45 -- -v
 
 # Structured output for parsing
@@ -316,7 +445,18 @@ Model Details:
 
 ### Multiple Statements with Semicolons
 ```bash
-# Preferred for LLM agents (stdin method + quiet mode)
+# Most preferred for LLM agents (file method + quiet mode)
+cat > /tmp/debug_json.py << 'EOF'
+import json
+print("=== JSON DATA ===")
+print(f"Data type: {type(data).__name__}")
+print(f"Size: {len(str(data))} chars")
+print("\nFormatted JSON:")
+print(json.dumps(data, indent=2, default=str))
+EOF
+pydebug --quiet -f /tmp/debug_json.py tests/test_data.py 22 -- -v
+
+# Good for quick JSON output (stdin method + quiet mode)
 echo 'import json; print(json.dumps(data, indent=2))' | pydebug-stdin --quiet tests/test_data.py 22 -- -v
 
 # Complex multi-statement analysis
@@ -350,16 +490,22 @@ echo 'import json; print(f"Status: {response.status_code}\nHeaders: {dict(respon
 
 ## 🤖 For LLM Agents (Critical Information)
 
-### ALWAYS Use Stdin Method with Quiet Mode
+### ALWAYS Use File Parameter Method with Quiet Mode
 
-**IMPORTANT**: As an LLM agent, you should **always use the `pydebug-stdin` method with `--quiet` mode** as your default approach:
+**IMPORTANT**: As an LLM agent, you should **always use the file parameter method (`-f`) with `--quiet` mode** as your default approach:
 
 ```bash
-# ✅ ALWAYS DO THIS (preferred method + saves 90%+ context)
-echo 'print(variable)' | pydebug-stdin --quiet test_file.py 42 -- -v
-echo 'print(data)' | pydebug-stdin --quiet test.py 10 -- -v
+# ✅ MOST PREFERRED (file method + saves 90%+ context)
+cat > /tmp/debug.py << 'EOF'
+print(f"Variable: {variable}")
+print(f"Type: {type(variable)}")
+EOF
+pydebug --quiet -f /tmp/debug.py test_file.py 42 -- -v
 
-# ✅ ACCEPTABLE (for simple cases)
+# ✅ GOOD (stdin for medium complexity)
+echo 'print(variable)' | pydebug-stdin --quiet test_file.py 42 -- -v
+
+# ✅ ACCEPTABLE (direct for simple cases)
 pydebug --quiet test_file.py 42 "print(variable)" -- -v
 
 # ❌ AVOID THIS (wastes valuable context)
@@ -367,13 +513,15 @@ echo 'print(data)' | pydebug-stdin test.py 10 -- -v
 pydebug test_file.py 42 "print(variable)" -- -v
 ```
 
-### Why Stdin Method is Superior for LLMs
+### Why File Parameter Method is Superior for LLMs
 
-1. **Handles Complex Commands Perfectly**: No issues with nested quotes or multiline expressions
-2. **Predictable Execution**: Commands are processed as complete units
-3. **Better for Automation**: More reliable parsing and execution
-4. **Avoids Shell Escaping**: No need to worry about quote conflicts
-5. **Perfect for JSON/Formatted Output**: Handles complex formatting without issues
+1. **Separation of Concerns**: Debug logic separate from shell commands
+2. **Reusable Debug Scripts**: Save and reuse complex debugging patterns
+3. **Natural Python Writing**: No shell escaping or quoting issues
+4. **Production Code Debugging**: Safely debug production through test contexts
+5. **Complex Logic Support**: Multi-line debugging with proper structure
+6. **Better Error Handling**: Clear Python syntax errors
+7. **Predictable Execution**: Most reliable method for automation
 
 ### What This Tool Does
 - Sets a breakpoint at the specified line
@@ -417,7 +565,26 @@ echo 'print("Hello from debugger!")' | pydebug-stdin --help
 
 ### Example 1: Debug Test Failure
 ```bash
-# Preferred approach for LLM agents (stdin method + quiet mode)
+# Most preferred approach for LLM agents (file method + quiet mode)
+cat > /tmp/debug_auth.py << 'EOF'
+print("=== AUTHENTICATION DEBUG ===")
+print(f"Token: {token}")
+print(f"Token type: {type(token).__name__}")
+print(f"User: {user}")
+if isinstance(user, dict):
+    print(f"User ID: {user.get('id')}")
+    print(f"User name: {user.get('name')}")
+EOF
+pydebug --quiet -f /tmp/debug_auth.py tests/test_auth.py 15 -- -v
+# Output:
+# === AUTHENTICATION DEBUG ===
+# Token: None
+# Token type: NoneType
+# User: {'id': 123, 'name': 'test'}
+# User ID: 123
+# User name: test
+
+# Good for quick inspection (stdin method + quiet mode)
 echo 'print(f"token={token}, user={user}")' | pydebug-stdin --quiet tests/test_auth.py 15 -- -v
 # Output:
 # token=None, user={'id': 123, 'name': 'test'}
@@ -442,7 +609,28 @@ echo 'print(f"token={token}, user={user}")' | pydebug-stdin tests/test_auth.py 1
 
 ### Example 2: Check Data Structure
 ```bash
-# Preferred approach for LLM agents (stdin method + quiet mode)
+# Most preferred approach for LLM agents (file method + quiet mode)
+cat > /tmp/debug_parser.py << 'EOF'
+import json
+print("=== PARSED DATA STRUCTURE ===")
+print(f"Type: {type(parsed_data).__name__}")
+print(f"Keys: {list(parsed_data.keys())}")
+print("\nDetailed analysis:")
+for key, value in parsed_data.items():
+    print(f"  {key}: {type(value).__name__} (size: {len(str(value))} chars)")
+EOF
+pydebug --quiet -f /tmp/debug_parser.py tests/test_parser.py 30 -- -v
+# Output:
+# === PARSED DATA STRUCTURE ===
+# Type: dict
+# Keys: ['header', 'body', 'footer']
+# 
+# Detailed analysis:
+#   header: str (size: 45 chars)
+#   body: dict (size: 234 chars)
+#   footer: str (size: 67 chars)
+
+# Good for quick checks (stdin method + quiet mode)
 echo 'print(list(parsed_data.keys()))' | pydebug-stdin --quiet tests/test_parser.py 30 -- -v
 # Output:
 # ['header', 'body', 'footer']
@@ -453,7 +641,22 @@ echo 'import json; print(json.dumps({"keys": list(parsed_data.keys()), "types": 
 
 ### Example 3: Complex REPL Command
 ```bash
-# Preferred approach for LLM agents (stdin method + quiet mode)
+# Most preferred approach for LLM agents (file method + quiet mode)
+cat > /tmp/debug_response.py << 'EOF'
+import json
+print("=== API RESPONSE ANALYSIS ===")
+for k, v in response.items():
+    print(f"{k}: {type(v).__name__}")
+    if isinstance(v, (str, int, float, bool)):
+        print(f"  Value: {v}")
+    elif isinstance(v, (list, dict)):
+        print(f"  Length: {len(v)}")
+        if v and isinstance(v, list):
+            print(f"  First item type: {type(v[0]).__name__}")
+EOF
+pydebug --quiet -f /tmp/debug_response.py tests/test_api.py 48 -- -v
+
+# Good for type inspection (stdin method + quiet mode)
 echo 'for k, v in response.items(): print(f"{k}: {type(v)}")' | pydebug-stdin --quiet tests/test_api.py 48 -- -v
 # Output:
 # status: <class 'int'>
@@ -466,7 +669,29 @@ echo 'import json; analysis = {"response_structure": {k: {"type": str(type(v)), 
 
 ### Example 4: Real-World NetworkX Graph Debugging
 ```bash
-# Preferred approach for LLM agents (stdin method + quiet mode saves ~95% context)
+# Most preferred approach for LLM agents (file method + quiet mode saves ~95% context)
+cat > /tmp/debug_graph.py << 'EOF'
+print("=== GRAPH DEBUG ===")
+print(f"Type: {type(graph).__name__}")
+print(f"Nodes: {graph.number_of_nodes()}")
+print(f"Edges: {graph.number_of_edges()}")
+print(f"First 5 nodes: {list(graph.nodes())[:5]}")
+
+# Node analysis
+node_data = dict(list(graph.nodes(data=True))[:3])
+print("\nSample node data:")
+for node, attrs in node_data.items():
+    print(f"  {node}: {attrs}")
+
+# Edge analysis  
+edge_data = list(graph.edges(data=True))[:3]
+print("\nSample edge data:")
+for u, v, attrs in edge_data:
+    print(f"  {u} -> {v}: {attrs}")
+EOF
+pydebug --quiet -f /tmp/debug_graph.py tests/test_smart_content/test_integration_pipeline.py 64 -- -k test_complete_pipeline_with_real_llm -xvs --tb=no
+
+# Good for quick graph stats (stdin method + quiet mode)
 echo 'print(f"""
 === GRAPH DEBUG ===
 Type: {type(graph)}
@@ -555,41 +780,51 @@ print("line2")' | pydebug-stdin test.py 10 -- -v  # ❌ Shell will be confused
 ## ✅ What TO Do
 
 ```bash
-# DO always use stdin method with --quiet mode for LLM efficiency
-echo 'print(variable)' | pydebug-stdin --quiet test.py 10 -- -v  # ✅ PREFERRED
-
-# DO use print statements with stdin method + quiet mode
-echo 'print(variable)' | pydebug-stdin --quiet test.py 10 -- -v  # ✅ PREFERRED
-
-# DO use Python expressions with stdin method + quiet mode
-echo 'print(2 + 2)' | pydebug-stdin --quiet test.py 10 -- -v  # ✅ PREFERRED
-
-# DO access any variable in scope with stdin method + quiet mode
-echo 'print(locals())' | pydebug-stdin --quiet test.py 10 -- -v  # ✅ PREFERRED
-
-# DO use semicolons for multiple statements with stdin method + quiet mode
-echo 'x = 5; y = 10; print(f"x={x}, y={y}")' | pydebug-stdin --quiet test.py 10 -- -v  # ✅ PREFERRED
-
-# DO use complex multiline expressions with stdin method
-echo 'print(f"""
-Debug Info:
-  x = {x}
-  y = {y}
-  sum = {x + y}
-""")' | pydebug-stdin --quiet test.py 10 -- -v  # ✅ PREFERRED
-
-# DO use JSON formatting for complex data with stdin method
-echo 'import json; print(json.dumps(data, indent=2))' | pydebug-stdin --quiet test.py 10 -- -v  # ✅ PREFERRED
-
-# DO use direct method for simple cases (acceptable alternative)
-pydebug --quiet test.py 10 "print(variable)" -- -v  # ✅ ACCEPTABLE
-
-# DO use temporary files for very complex multiline code
+# DO always use file parameter method with --quiet mode for LLM efficiency
 cat > /tmp/debug.py << 'EOF'
-for i in range(3):
-    print(f"i={i}")
+print(variable)
 EOF
-pydebug --quiet test.py 10 "exec(open('/tmp/debug.py').read())" -- -v  # ✅ FOR COMPLEX CASES
+pydebug --quiet -f /tmp/debug.py test.py 10 -- -v  # ✅ MOST PREFERRED
+
+# DO use stdin method for medium complexity with --quiet mode
+echo 'print(variable)' | pydebug-stdin --quiet test.py 10 -- -v  # ✅ GOOD
+
+# DO use Python expressions with file method + quiet mode
+cat > /tmp/debug.py << 'EOF'
+print(2 + 2)
+EOF
+pydebug --quiet -f /tmp/debug.py test.py 10 -- -v  # ✅ MOST PREFERRED
+
+# DO access any variable in scope with file method + quiet mode
+cat > /tmp/debug.py << 'EOF'
+import pprint
+print("=== LOCAL VARIABLES ===")
+pprint.pprint({k: v for k, v in locals().items() if not k.startswith('_')})
+EOF
+pydebug --quiet -f /tmp/debug.py test.py 10 -- -v  # ✅ MOST PREFERRED
+
+# DO use complex multiline expressions with file method
+cat > /tmp/debug.py << 'EOF'
+print("""Debug Info:
+  x = {}
+  y = {}
+  sum = {}""".format(x, y, x + y))
+EOF
+pydebug --quiet -f /tmp/debug.py test.py 10 -- -v  # ✅ MOST PREFERRED
+
+# DO use JSON formatting for complex data with file method
+cat > /tmp/debug.py << 'EOF'
+import json
+print("=== JSON DATA ===")
+print(json.dumps(data, indent=2, default=str))
+EOF
+pydebug --quiet -f /tmp/debug.py test.py 10 -- -v  # ✅ MOST PREFERRED
+
+# DO use stdin method for medium complexity
+echo 'print(f"x={x}, y={y}")' | pydebug-stdin --quiet test.py 10 -- -v  # ✅ GOOD
+
+# DO use direct method for simple cases only
+pydebug --quiet test.py 10 "print(variable)" -- -v  # ✅ ACCEPTABLE
 ```
 
 ## 🎯 Summary
@@ -775,19 +1010,33 @@ Performance Debug:
 ### Common Standalone Debugging Patterns
 
 ```bash
-# Pattern 1: Quick variable inspection
-echo 'print(variable_name)' | pydebug-stdin --quiet --mode standalone script.py 42
+# Pattern 1: Quick variable inspection (file method - MOST PREFERRED)
+cat > /tmp/debug.py << 'EOF'
+print(f"Variable: {variable_name}")
+print(f"Type: {type(variable_name).__name__}")
+EOF
+pydebug --quiet -f /tmp/debug.py --mode standalone script.py 42
 
-# Pattern 2: Detailed state analysis
-echo 'print(locals())' | pydebug-stdin --quiet --mode standalone script.py 42
+# Pattern 2: Detailed state analysis (file method - MOST PREFERRED)
+cat > /tmp/debug.py << 'EOF'
+import pprint
+print("=== LOCAL STATE ===")
+pprint.pprint({k: v for k, v in locals().items() if not k.startswith('_')})
+EOF
+pydebug --quiet -f /tmp/debug.py --mode standalone script.py 42
 
-# Pattern 3: Data structure debugging
-echo 'import json; print(json.dumps(data, indent=2, default=str))' | pydebug-stdin --quiet --mode standalone script.py 42
+# Pattern 3: Data structure debugging (file method - MOST PREFERRED)
+cat > /tmp/debug.py << 'EOF'
+import json
+print("=== DATA STRUCTURE ===")
+print(json.dumps(data, indent=2, default=str))
+EOF
+pydebug --quiet -f /tmp/debug.py --mode standalone script.py 42
 
-# Pattern 4: Module execution debugging
+# Pattern 4: Module execution debugging (stdin method - acceptable for simple cases)
 echo 'print(f"Module: {__name__}, Package: {__package__}")' | pydebug-stdin --quiet -m package.module 10
 
-# Pattern 5: Script with complex arguments
+# Pattern 5: Script with complex arguments (stdin method - acceptable for simple cases)
 echo 'print(f"Args: {sys.argv[1:]}")' | pydebug-stdin --quiet --mode standalone cli_tool.py 20 -- --input data.csv --output result.json --verbose
 ```
 
@@ -837,15 +1086,15 @@ pydebug --quiet tests/test_integration.py 64 "exec(open('/tmp/debug_graph.py').r
 - `-v`: Verbose output
 
 ### Tips for Usage
-1. **ALWAYS use stdin method with --quiet mode**: Essential for LLM agents to save context and ensure reliable execution
-2. **For simple one-liners**: Use `echo 'command' | pydebug-stdin --quiet`
-3. **For complex expressions**: Use stdin method with multiline strings or JSON formatting
-4. **For very complex multiline commands**: Use the temporary file approach with `--quiet`
-5. **Use semicolons** to join multiple statements when using stdin method
-6. **Leverage multiline strings**: Use triple quotes for formatted output with stdin method
-7. **JSON formatting**: Perfect for complex data structures with stdin method
-8. **Context efficiency**: Stdin method + quiet mode reduces output by 90%+ while providing maximum debugging capability
-9. **Avoid shell escaping issues**: Stdin method handles complex quotes and expressions naturally
-10. **Perfect for automation**: Stdin method provides most reliable execution for LLM agents
+1. **ALWAYS use file parameter method with --quiet mode**: Essential for LLM agents - best separation of concerns and reliability
+2. **For complex debugging**: Use `pydebug --quiet -f /tmp/debug.py` for structured, reusable debug scripts
+3. **For medium complexity**: Use stdin method `echo 'command' | pydebug-stdin --quiet`
+4. **For simple one-liners**: Use direct method `pydebug --quiet test.py 42 "print(x)"`
+5. **Write natural Python**: File parameter method lets you write Python without shell escaping
+6. **Leverage structured output**: File method makes it easy to format complex debug output
+7. **JSON formatting**: Perfect for complex data structures with file method
+8. **Context efficiency**: File method + quiet mode reduces output by 90%+ while providing maximum debugging capability
+9. **Debug production via tests**: File method is safest for debugging production code through test contexts
+10. **Reusable debug scripts**: File method allows saving and reusing debug logic
 11. **Use --mode standalone**: When debugging non-test Python files
 12. **Use -m flag**: For debugging Python modules directly

@@ -73,6 +73,15 @@ debug-loop:
         -- \
         -v -s
 
+# Example debugging with file parameter
+debug-file:
+    echo "print(f'Debug: total_string={total_string}')" > scratch/debug_cmd.py
+    PYTHONPATH=src python3 src/pydebug-stdin -f scratch/debug_cmd.py --quiet \
+        tests/sample_projects/simple_project/test_example.py \
+        11 \
+        -- \
+        -v -s
+
 clean:
     find . -name "*.pyc" -delete
     find . -name "__pycache__" -delete

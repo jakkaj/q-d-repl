@@ -16,7 +16,7 @@ def test_file_not_found():
     # Set PYTHONPATH to include src directory
     env = os.environ.copy()
     env["PYTHONPATH"] = str(SRC_DIR)
-    
+
     result = subprocess.run(
         [
             sys.executable,
@@ -41,7 +41,7 @@ def test_invalid_arguments():
     # Set PYTHONPATH to include src directory
     env = os.environ.copy()
     env["PYTHONPATH"] = str(SRC_DIR)
-    
+
     # Missing arguments
     result = subprocess.run(
         [sys.executable, "-m", "smart_debugger"],
@@ -58,7 +58,7 @@ def test_invalid_arguments():
 def test_invalid_line_number():
     """Test handling of non-numeric line number."""
     test_file = Path(__file__).parent / "sample_projects/simple_project/test_example.py"
-    
+
     # Set PYTHONPATH to include src directory
     env = os.environ.copy()
     env["PYTHONPATH"] = str(SRC_DIR)
@@ -101,7 +101,7 @@ def test_fails():
         # Set PYTHONPATH to include src directory
         env = os.environ.copy()
         env["PYTHONPATH"] = str(SRC_DIR)
-        
+
         # Set breakpoint on line that will execute before the assertion
         result = subprocess.run(
             [
@@ -131,7 +131,7 @@ def test_fails():
 def test_syntax_error_in_command():
     """Test handling of syntax errors in REPL command."""
     test_file = Path(__file__).parent / "sample_projects/simple_project/test_example.py"
-    
+
     # Set PYTHONPATH to include src directory
     env = os.environ.copy()
     env["PYTHONPATH"] = str(SRC_DIR)
@@ -162,7 +162,7 @@ def test_syntax_error_in_command():
 def test_runtime_error_in_command():
     """Test handling of runtime errors in REPL command."""
     test_file = Path(__file__).parent / "sample_projects/simple_project/test_example.py"
-    
+
     # Set PYTHONPATH to include src directory
     env = os.environ.copy()
     env["PYTHONPATH"] = str(SRC_DIR)

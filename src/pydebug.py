@@ -1,6 +1,17 @@
 #!/usr/bin/env python3
 """
 Smart debugger wrapper that handles multiline commands properly.
+
+Usage:
+    pydebug [--mode MODE] [--quiet|-q] [-m] <file> <line> <command> -- [args]
+    pydebug [--mode MODE] [--quiet|-q] [-m] -f <command_file> <file> <line> -- [args]
+
+Examples:
+    # Direct command
+    pydebug test.py 42 "print(x)" -- -v
+
+    # Command from file
+    pydebug -f debug_script.py test.py 42 -- -v
 """
 import os
 import subprocess
@@ -40,9 +51,40 @@ def main():
         quiet_mode = True
         args.remove("-q")
 
-    if len(args) < 3:
+    # Check for -f/--file flag
+    command_file = None
+    if "-f" in args:
+        f_idx = args.index("-f")
+        if f_idx + 1 >= len(args):
+            print("Error: -f flag requires a file path", file=sys.stderr)
+            return 1
+        command_file = args[f_idx + 1]
+        args.pop(f_idx)  # Remove -f
+        args.pop(f_idx)  # Remove file path
+    elif "--file" in args:
+        f_idx = args.index("--file")
+        if f_idx + 1 >= len(args):
+            print("Error: --file flag requires a file path", file=sys.stderr)
+            return 1
+        command_file = args[f_idx + 1]
+        args.pop(f_idx)  # Remove --file
+        args.pop(f_idx)  # Remove file path
+
+    # Validate remaining arguments
+    if command_file and len(args) < 2:
+        print(
+            "Usage: pydebug [--mode MODE] [--quiet|-q] [-m] -f <command_file> "
+            "<file> <line> -- [args]",
+            file=sys.stderr,
+        )
+        return 1
+    elif not command_file and len(args) < 3:
         print(
             "Usage: pydebug [--mode MODE] [--quiet|-q] [-m] <file> <line> <command> -- [args]",
+            file=sys.stderr,
+        )
+        print(
+            "   OR: pydebug [--mode MODE] [--quiet|-q] [-m] -f <command_file> <file> <line> -- [args]",
             file=sys.stderr,
         )
         print("Modes: pytest (default), standalone", file=sys.stderr)
@@ -50,7 +92,32 @@ def main():
 
     file_path = args[0]
     line_no = args[1]
-    command = args[2]
+
+    # Read command from file or argument
+    if command_file:
+        try:
+            with open(command_file, "r", encoding="utf-8") as f:
+                command = f.read().strip()
+            if not command:
+                print(f"Error: Command file {command_file} is empty", file=sys.stderr)
+                return 1
+        except FileNotFoundError:
+            print(f"Error: Command file not found: {command_file}", file=sys.stderr)
+            return 1
+        except PermissionError:
+            print(f"Error: Permission denied reading {command_file}", file=sys.stderr)
+            return 1
+        except UnicodeDecodeError:
+            print(
+                f"Error: Invalid encoding in {command_file}. Ensure file is UTF-8",
+                file=sys.stderr,
+            )
+            return 1
+        except Exception as e:
+            print(f"Error reading command file {command_file}: {e}", file=sys.stderr)
+            return 1
+    else:
+        command = args[2]
 
     # Convert relative path to absolute
     if not os.path.isabs(file_path):
