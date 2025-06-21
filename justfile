@@ -9,6 +9,36 @@ default:
 install:
     pip3 install -r requirements.txt
 
+# === Substrate CLI Development Tasks ===
+# Run `just --list` to see all available commands
+
+
+fft: format fix test
+
+# === Code Quality ===
+ff: format fix
+
+# Format code automatically (like dart format)
+format:
+    black ./ tests/
+    isort ./ tests/
+
+# Fix code issues automatically (like dart fix)
+fix:
+    autoflake --remove-all-unused-imports --remove-unused-variables --in-place --recursive ./ tests/
+    isort ./ tests/
+    black ./ tests/
+
+# Run linting checks
+lint:
+    flake8 ./ tests/ --max-line-length=88 --ignore=E203,W503,F401,F403,F841,E402
+    black --check ./ tests/
+    isort --check-only ./ tests/
+
+# Run type checking
+typecheck:
+    mypy ./ --config-file pyproject.toml
+
 # Run debugger tests
 test:
     python3 -m pytest tests/ -v

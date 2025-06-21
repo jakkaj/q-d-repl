@@ -71,7 +71,8 @@
       "Bash(mv:*)",
       "Bash(echo*)",
       "Bash(pydebug-stdin*)",
-      "Bash(./pydebug:*)"
+      "Bash(./pydebug:*)",
+      "WebFetch(domain:claude.ai)"
     ],
     "deny": []
   }
