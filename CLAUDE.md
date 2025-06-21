@@ -284,6 +284,32 @@ echo 'print(f"data shape: {data.shape}, columns: {list(data.columns)}")' | pydeb
 echo 'print(f"config loaded: {config}")' | pydebug-stdin -m myapp.main --quiet 30 -- --env production
 ```
 
+## Git and Commit Guidelines
+
+### Commit Message Format
+Follow **Conventional Commits (Angular style)**:
+
+- **Format**: `type(scope): description`
+- **Reference issues**: Include `Fixes #123` when applicable
+- **Types**:
+  - **MAJOR/BREAKING**: `type(scope)!:` or include `BREAKING CHANGE:` in footer
+  - **MINOR**: `feat:` for feature additions, non-breaking refactors
+  - **PATCH**: `fix:`, `docs:`, `style:`, `test:` for bug fixes, documentation, style changes
+
+**Examples**:
+```
+fix(pydebug): correct module import paths in debugging scripts
+feat(debugger): add standalone Python script debugging support  
+docs: update CLAUDE.md with commit message guidelines
+test: add integration tests for quiet mode functionality
+```
+
+### Git Workflow
+- **Branching**: Create branches from `main` for features
+- **Commits**: Use conventional commit format with clear descriptions
+- **Testing**: Always run tests before committing (`just test`)
+- **Quality**: Run quality checks before committing (`just quality`)
+
 ## Best Practices
 
 ### For LLM Agents
