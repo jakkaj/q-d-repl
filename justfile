@@ -92,3 +92,13 @@ clean:
 dev-install:
     pip3 install -e .
 
+# Update GitHub issue with plan content
+update-issue issue_number title plan_path:
+    @echo "📝 Updating GitHub issue #{{issue_number}} with {{plan_path}}..."
+    PAGER=cat gh issue edit {{issue_number}} --title "{{title}}" --body-file {{plan_path}}
+    @echo "✅ Issue #{{issue_number}} updated successfully"
+
+# Get GitHub issue details
+get-issue issue_number:
+    @echo "📋 Fetching GitHub issue #{{issue_number}}..."
+    PAGER=cat gh issue view {{issue_number}}
