@@ -7,7 +7,7 @@ default:
 
 # Install debugger dependencies
 install:
-    pip3 install -r requirements.txt
+    pip3 install -r requirements.txt --break-system-packages
 
 # === Substrate CLI Development Tasks ===
 # Run `just --list` to see all available commands
@@ -102,3 +102,6 @@ update-issue issue_number title plan_path:
 get-issue issue_number:
     @echo "📋 Fetching GitHub issue #{{issue_number}}..."
     PAGER=cat gh issue view {{issue_number}}
+
+update-claude:
+    npm update -g @anthropic-ai/claude-code
